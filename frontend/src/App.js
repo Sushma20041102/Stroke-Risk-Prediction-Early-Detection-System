@@ -23,7 +23,7 @@ function App() {
 
   const submit = async () => {
   const res = await fetch(
-  "https://stroke-risk-prediction-and-early.onrender.com",
+  "https://stroke-ai-predictor-9ep6.onrender.com/predict",
   {
     method: "POST",
     headers: { "Content-Type": "application/json" },
