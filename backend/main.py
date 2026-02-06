@@ -47,27 +47,27 @@ def home():
 @app.post("/predict")
 def predict(data: StrokeInput):
 
-    # Create DataFrame with correct column order and feature names
-    # Order must match training: gender FIRST, then age
+    # Build input data as dictionary (ensures feature names are preserved)
+    input_dict = {
+        'gender': gender_map.get(data.gender, 1),
+        'age': data.age,
+        'hypertension': data.hypertension,
+        'heart_disease': data.heart_disease,
+        'ever_married': yesno_map.get(data.ever_married, 1),
+        'work_type': work_map.get(data.work_type, 0),
+        'Residence_type': res_map.get(data.Residence_type, 1),
+        'avg_glucose_level': data.avg_glucose_level,
+        'bmi': data.bmi,
+        'smoking_status': smoke_map.get(data.smoking_status, 0)
+    }
+    
+    # Create DataFrame from dict (preserves column names and order)
+    df = pd.DataFrame([input_dict])
+    
+    # Ensure correct column order to match training
     feature_order = ['gender', 'age', 'hypertension', 'heart_disease', 'ever_married', 
                      'work_type', 'Residence_type', 'avg_glucose_level', 'bmi', 'smoking_status']
-    
-    # Build data in correct order with proper encoding
-    encoded_data = [
-        gender_map.get(data.gender, 1),
-        data.age,
-        data.hypertension,
-        data.heart_disease,
-        yesno_map.get(data.ever_married, 1),
-        work_map.get(data.work_type, 0),
-        res_map.get(data.Residence_type, 1),
-        data.avg_glucose_level,
-        data.bmi,
-        smoke_map.get(data.smoking_status, 0)
-    ]
-    
-    # Create DataFrame with explicit column names
-    df = pd.DataFrame([encoded_data], columns=feature_order)
+    df = df[feature_order]
     
     try:
         pred = int(model.predict(df)[0])
