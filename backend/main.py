@@ -13,15 +13,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Load trained model
+# Load trained model and encoders
 model = joblib.load("stroke_xgb.pkl")
+encoders = joblib.load("encoders.pkl")
 
-# SIMPLE, SAFE MANUAL ENCODING (prevents 500 error)
-gender_map = {"Male": 1, "Female": 0}
-yesno_map = {"Yes": 1, "No": 0}
-work_map = {"Private": 0, "Self-employed": 1, "Govt_job": 2, "children": 3}
-res_map = {"Urban": 1, "Rural": 0}
-smoke_map = {"never smoked": 0, "formerly smoked": 1, "smokes": 2, "Unknown": 3}
+# Create reverse mappings (category_name -> code)
+def create_reverse_map(encoder_dict):
+    return {v: k for k, v in encoder_dict.items()}
+
+# Build encoding maps from the saved encoders
+gender_map = create_reverse_map(encoders["gender"])
+yesno_map = create_reverse_map(encoders["ever_married"])
+work_map = create_reverse_map(encoders["work_type"])
+res_map = create_reverse_map(encoders["Residence_type"])
+smoke_map = create_reverse_map(encoders["smoking_status"])
 
 class StrokeInput(BaseModel):
     age: int
@@ -42,26 +47,27 @@ def home():
 @app.post("/predict")
 def predict(data: StrokeInput):
 
-    # Convert everything to numbers BEFORE prediction
-    encoded = {
-        "age": data.age,
-        "gender": gender_map.get(data.gender, 1),
-        "hypertension": data.hypertension,
-        "heart_disease": data.heart_disease,
-        "ever_married": yesno_map.get(data.ever_married, 1),
-        "work_type": work_map.get(data.work_type, 0),
-        "Residence_type": res_map.get(data.Residence_type, 1),
-        "avg_glucose_level": data.avg_glucose_level,
-        "bmi": data.bmi,
-        "smoking_status": smoke_map.get(data.smoking_status, 0)
-    }
-
-    df = pd.DataFrame([encoded])
-    
-    # Reorder columns to match training order (gender FIRST, then age)
+    # Create DataFrame with correct column order and feature names
+    # Order must match training: gender FIRST, then age
     feature_order = ['gender', 'age', 'hypertension', 'heart_disease', 'ever_married', 
                      'work_type', 'Residence_type', 'avg_glucose_level', 'bmi', 'smoking_status']
-    df = df[feature_order]
+    
+    # Build data in correct order with proper encoding
+    encoded_data = [
+        gender_map.get(data.gender, 1),
+        data.age,
+        data.hypertension,
+        data.heart_disease,
+        yesno_map.get(data.ever_married, 1),
+        work_map.get(data.work_type, 0),
+        res_map.get(data.Residence_type, 1),
+        data.avg_glucose_level,
+        data.bmi,
+        smoke_map.get(data.smoking_status, 0)
+    ]
+    
+    # Create DataFrame with explicit column names
+    df = pd.DataFrame([encoded_data], columns=feature_order)
     
     try:
         pred = int(model.predict(df)[0])
